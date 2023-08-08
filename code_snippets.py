@@ -22,7 +22,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 # Tries to split on them in order until the chunks are small enough
 # Keep paragraphs, sentences, words together as long as possible
 splitter = RecursiveCharacterTextSplitter(
-    separators=[\\n\\n, \\n, " ", ""],
+    separators=["\\n\\n", "\\n", " ", ""],
     chunk_size={chunk_size}, 
     chunk_overlap={chunk_overlap},
     length_function=length_function,
