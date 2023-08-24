@@ -5,7 +5,16 @@ import tiktoken
 
 
 # Streamlit UI
-st.title("Text Splitter Playground")
+st.title("Pre-processing playground")
+st.info("""Pre-process your document into chunks and metadata using Langchain. Transformations included:
+
+- `Document Loader`: Load a document using built-in document loaders.
+- `Text Selectors`: Select fields from text to be: 1) embedded and 2) added as metadata. (Only supported for CSV and JSON document types.)
+- `Text Splitter` : Split the text to be embedded into chunks using different chunking techniques.
+- `
+        
+""")
+
 st.info("""Split a text into chunks using a **Text Splitter**. Parameters include:
 
 - `chunk_size`: Max size of the resulting chunks (in either characters or tokens, as selected)
