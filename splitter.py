@@ -1,7 +1,11 @@
 import streamlit as st
-from langchain.text_splitter import RecursiveCharacterTextSplitter, CharacterTextSplitter, Language
+from langchain.text_splitter import Language
 import code_snippets as code_snippets
 import tiktoken
+import tempfile
+import os
+from pathlib import Path
+from utils import text_splitter, document_loading, metadata_selector
 
 
 # Streamlit UI
@@ -11,10 +15,33 @@ st.info("""Pre-process your document into chunks and metadata using Langchain. T
 - `Document Loader`: Load a document using built-in document loaders.
 - `Text Selectors`: Select fields from text to be: 1) embedded and 2) added as metadata. (Only supported for CSV and JSON document types.)
 - `Text Splitter` : Split the text to be embedded into chunks using different chunking techniques.
-- `
         
 """)
 
+# Loaders
+st.header("Document Loading")
+st.info("""Load a document from a URL or a file. Pick the type of loader you want to use.""")
+doc = None
+# url = st.text_input(label="File URL", placeholder="URL for the file")
+# st.text("or")
+uploaded_file = st.file_uploader("Choose a file")
+loader_choices = ["JSONLoader", "CSVLoader", "PDF", "UnstructuredIO"]
+loader_choice = st.selectbox(
+    "Select a document loader", loader_choices
+)
+
+# Selectors
+st.header("Text Selectors")
+st.info("""Only supported for JSON or CSV. \n
+Select what fields from the object you want to use for embeddings vs just as metadata""")
+selectors = False
+if st.toggle(label="Enable selectors"):
+    selectors = True
+    string_to_embed = st.text_input(label="Fields to Embed", placeholder="Comma separated list of fields")
+    string_to_metadata = st.text_input(label="Fields for Metadata", placeholder="Comma separated list of fields")
+
+#Splitters
+st.header("Text Splitter")
 st.info("""Split a text into chunks using a **Text Splitter**. Parameters include:
 
 - `chunk_size`: Max size of the resulting chunks (in either characters or tokens, as selected)
@@ -52,75 +79,52 @@ with col4:
         "Select a Text Splitter", splitter_choices
     )
 
-if length_function == "Characters":
-    length_function = len
-    length_function_str = code_snippets.CHARACTER_LENGTH
-elif length_function == "Tokens":
-    enc = tiktoken.get_encoding("cl100k_base")
-
-
-    def length_function(text: str) -> int:
-        return len(enc.encode(text))
-
-
-    length_function_str = code_snippets.TOKEN_LENGTH
-else:
-    raise ValueError
-
-if splitter_choice == "Character":
-    import_text = code_snippets.CHARACTER.format(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        length_function=length_function_str
-    )
-
-elif splitter_choice == "RecursiveCharacter":
-    import_text = code_snippets.RECURSIVE_CHARACTER.format(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        length_function=length_function_str
-    )
-
-elif "Language." in splitter_choice:
-    import_text = code_snippets.LANGUAGE.format(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        language=splitter_choice,
-        length_function=length_function_str
-    )
-else:
-    raise ValueError
-
-st.info(import_text)
-
-# Box for pasting text
-doc = st.text_area("Paste your text here:")
-
+chunks = []
 # Split text button
-if st.button("Split Text"):
-    # Choose splitter
-    if splitter_choice == "Character":
-        splitter = CharacterTextSplitter(separator = "\n\n",
-                                         chunk_size=chunk_size, 
-                                         chunk_overlap=chunk_overlap,
-                                         length_function=length_function)
-    elif splitter_choice == "RecursiveCharacter":
-        splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, 
-                                                  chunk_overlap=chunk_overlap,
-                                         length_function=length_function)
-    elif "Language." in splitter_choice:
-        language = splitter_choice.split(".")[1].lower()
-        splitter = RecursiveCharacterTextSplitter.from_language(language,
-                                                                chunk_size=chunk_size,
-                                                                chunk_overlap=chunk_overlap,
-                                         length_function=length_function)
-    else:
-        raise ValueError
-    # Split the text
-    splits = splitter.split_text(doc)
+if st.button("Process Text", use_container_width=True):
+    # Load
+    if(uploaded_file):
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            # Write the data from the BytesIO object to the temporary file
+            temp_file.write(uploaded_file.read())
+                # Explicitly close the file
+            temp_file.close()
+            # Create a Path object using the temporary file's name attribute
+        file_path = Path(temp_file.name).resolve()
+        if(selectors):
+            fields_to_embed = string_to_embed.split(",")
+            fields_to_metadata = string_to_metadata.split(",")
+            documents = document_loading(temp_file=file_path, loader_choice=loader_choice, fields_to_embed=fields_to_embed)
+            metadata = metadata_selector(temp_file=file_path, loader_choice=loader_choice, fields_to_metadata=fields_to_metadata)
+        else: 
+            documents = document_loading(temp_file=file_path, loader_choice=loader_choice)
+        # Split
+        chunks = text_splitter(splitter_choice=splitter_choice, chunk_size=chunk_size, chunk_overlap=chunk_overlap, length_function=length_function, documents=documents)
+        os.remove(temp_file.name)
 
-    # Display the splits
-    for idx, split in enumerate(splits, start=1):
-        st.text_area(
-            f"Split {idx}", split, height=200
-        )
+if(len(chunks) > 0 ):
+    tab1, tab2, tab3 = st.tabs(["Chunk 1", "Chunk 2", "Chunk 3"])
+
+    with tab1:
+        st.header("Chunk 1")
+        st.text("Page Content")
+        st.text(chunks[0].page_content)
+        if(selectors):
+            st.text("Metadata")
+            st.text(metadata[0])
+
+    with tab2:
+        st.header("Chunk 2")
+        st.text("Page Content")
+        st.text(chunks[1].page_content)
+        if(selectors):
+            st.text("Metadata")
+            st.text(metadata[1])
+
+    with tab3:
+        st.header("Chunk 3")
+        st.text("Page Content")
+        st.text(chunks[2].page_content)
+        if(selectors):
+            st.text("Metadata")
+            st.text(metadata[2])
