@@ -1,11 +1,10 @@
 import streamlit as st
 from langchain.text_splitter import Language
-import code_snippets as code_snippets
 import tiktoken
 import tempfile
 import os
 from pathlib import Path
-from utils import text_splitter, document_loading, metadata_selector
+from utils import text_splitter, document_loading
 
 
 # Streamlit UI
@@ -31,7 +30,7 @@ loader_choice = st.selectbox(
 )
 
 # Selectors
-st.header("Text Selectors")
+st.header("Metadata Selectors")
 st.info("""Only supported for JSON or CSV. \n
 Select what fields from the object you want to use for embeddings vs just as metadata""")
 selectors = False
@@ -72,6 +71,15 @@ with col3:
         "Length Function", ["Characters", "Tokens"]
     )
 
+if length_function == "Characters":
+    length_function = len
+elif length_function == "Tokens":
+    enc = tiktoken.get_encoding("cl100k_base")
+    def length_function(text: str) -> int:
+        return len(enc.encode(text))
+else:
+    raise ValueError
+
 splitter_choices = ["RecursiveCharacter", "Character"] + [str(v) for v in Language]
 
 with col4:
@@ -94,37 +102,24 @@ if st.button("Process Text", use_container_width=True):
         if(selectors):
             fields_to_embed = string_to_embed.split(",")
             fields_to_metadata = string_to_metadata.split(",")
-            documents = document_loading(temp_file=file_path, loader_choice=loader_choice, fields_to_embed=fields_to_embed)
-            metadata = metadata_selector(temp_file=file_path, loader_choice=loader_choice, fields_to_metadata=fields_to_metadata)
+            documents = document_loading(temp_file=file_path, loader_choice=loader_choice, embed_keys=fields_to_embed, metadata_keys=fields_to_metadata)
         else: 
             documents = document_loading(temp_file=file_path, loader_choice=loader_choice)
         # Split
+        print(documents)
         chunks = text_splitter(splitter_choice=splitter_choice, chunk_size=chunk_size, chunk_overlap=chunk_overlap, length_function=length_function, documents=documents)
         os.remove(temp_file.name)
 
 if(len(chunks) > 0 ):
-    tab1, tab2, tab3 = st.tabs(["Chunk 1", "Chunk 2", "Chunk 3"])
+    tabs = []
+    for i in range(len(chunks)):
+        tabs.append("Chunk " + str(i+1))
+    allTabs = st.tabs(tabs)
 
-    with tab1:
-        st.header("Chunk 1")
-        st.text("Page Content")
-        st.text(chunks[0].page_content)
-        if(selectors):
-            st.text("Metadata")
-            st.text(metadata[0])
-
-    with tab2:
-        st.header("Chunk 2")
-        st.text("Page Content")
-        st.text(chunks[1].page_content)
-        if(selectors):
-            st.text("Metadata")
-            st.text(metadata[1])
-
-    with tab3:
-        st.header("Chunk 3")
-        st.text("Page Content")
-        st.text(chunks[2].page_content)
-        if(selectors):
-            st.text("Metadata")
-            st.text(metadata[2])
+    for i in range(len(allTabs)):
+        with allTabs[i]:
+            st.subheader("Page Content")
+            st.text(chunks[i].page_content)
+            if(selectors):
+                st.subheader("Metadata")
+                st.text(chunks[i].metadata)

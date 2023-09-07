@@ -11,26 +11,39 @@ class CSVLoader(BaseLoader):
         file_path: str,
         source_column: Optional[str] = None,
         csv_args: Optional[Dict] = None,
-        encoding: Optional[str] = None,
-        filter_keys: Optional[List[str]] = None  # New parameter for filtering columns
+        encoding: Optional[str] = 'utf-8-sig',
+        embed_keys: Optional[List[str]] = None,
+        metadata_keys: Optional[List[str]] = None
     ):
         self.file_path = file_path
         self.source_column = source_column
         self.encoding = encoding
         self.csv_args = csv_args or {}
-        self.filter_keys = filter_keys  # Store the filter_keys
+        self.embed_keys = embed_keys
+        self.metadata_keys = metadata_keys
+
+    def extract_metadata(self, row: Dict) -> Dict:
+        metadata = {}
+        if self.metadata_keys:
+            for key in self.metadata_keys:
+                if key in row:
+                    metadata[key] = row[key]
+        return metadata
 
     def load(self) -> List[Document]:
-        """Load data into document objects."""
-
         docs = []
         with open(self.file_path, newline="", encoding=self.encoding) as csvfile:
             csv_reader = csv.DictReader(csvfile, **self.csv_args)  # type: ignore
             for i, row in enumerate(csv_reader):
-                # Only include the columns that are in filter_keys if filter_keys is not None
-                if self.filter_keys is not None:
-                    row = {k: row[k] for k in self.filter_keys if k in row}
+                metadata = self.extract_metadata(row)
+                
+                if self.embed_keys is not None:
+                    row = {k: row[k] for k in self.embed_keys if k in row}
+                elif self.embed_keys is None:
+                    row = {k: row[k] for k in row}
+                
                 content = "\n".join(f"{k.strip()}: {v.strip()}" for k, v in row.items())
+                
                 try:
                     source = (
                         row[self.source_column]
@@ -41,7 +54,10 @@ class CSVLoader(BaseLoader):
                     raise ValueError(
                         f"Source column '{self.source_column}' not found in CSV file."
                     )
-                metadata = {"source": source, "row": i}
+                
+                metadata["source"] = source
+                metadata["row"] = i
+
                 doc = Document(page_content=content, metadata=metadata)
                 docs.append(doc)
 

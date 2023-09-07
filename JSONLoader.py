@@ -9,51 +9,52 @@ class JSONLoader(BaseLoader):
     def __init__(
         self,
         file_path: Union[str, Path],
-        content_key: Optional[str] = None,
-        filter_keys: Optional[List[str]] = None  # New parameter for filtering
-        ):
+        embed_keys: Optional[List[str]] = None,
+        metadata_keys: Optional[List[str]] = None
+    ):
         self.file_path = file_path
-        self._content_key = content_key
-        self.filter_keys = filter_keys  # Store the filter_keys
+        self.embed_keys = embed_keys
+        self.metadata_keys = metadata_keys
 
-    def create_documents(self, processed_data):
+    def create_documents(self, processed_data_list):
         documents = []
-        for item in processed_data:
-            content = ''.join(item)
-            document = Document(page_content=content, metadata={})
+        for processed_data in processed_data_list:
+            content = ''.join(processed_data['data'])
+            metadata = processed_data['metadata']
+            document = Document(page_content=content, metadata=metadata)
             documents.append(document)
         return documents
-    
-    def process_item(self, item, prefix=""):
+
+    def extract_metadata(self, item: Dict) -> Dict:
+        metadata = {}
+        if self.metadata_keys:
+            for key in self.metadata_keys:
+                if key in item:
+                    metadata[key] = item[key]
+        return metadata
+
+    def process_item(self, item, prefix="", metadata={}):
         if isinstance(item, dict):
+            new_metadata = self.extract_metadata(item)
+            new_metadata.update(metadata)  # Merge existing metadata with new metadata
             result = []
             for key, value in item.items():
                 new_prefix = f"{prefix}.{key}" if prefix else key
-                if self.filter_keys is None or new_prefix in self.filter_keys:  # Check if this key should be processed
-                    result.extend(self.process_item(value, new_prefix))
+                if self.embed_keys is None or new_prefix in self.embed_keys or not self.embed_keys:
+                    result.extend(self.process_item(value, new_prefix, new_metadata))
             return result
         elif isinstance(item, list):
             result = []
             for value in item:
-                result.extend(self.process_item(value, prefix))
+                result.extend(self.process_item(value, prefix, metadata))
             return result
         else:
-            return [f"{prefix}: {item}"]
+            return [{'data': [f"{prefix}: {item}"], 'metadata': metadata}]
 
     def process_json(self, data):
-        if isinstance(data, list):
-            processed_data = []
-            for item in data:
-                processed_data.extend(self.process_item(item))
-            return processed_data
-        elif isinstance(data, dict):
-            return self.process_item(data)
-        else:
-            return []
+        return self.process_item(data)
 
     def load(self) -> List[Document]:
-        """Load and return documents from the JSON file."""
-
         docs = []
         with open(self.file_path, 'r') as json_file:
             try:
@@ -63,4 +64,7 @@ class JSONLoader(BaseLoader):
             except json.JSONDecodeError:
                 print("Error: Invalid JSON format in the file.")
         return docs
+
+
+
     
