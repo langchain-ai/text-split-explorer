@@ -2,7 +2,13 @@ import streamlit as st
 from langchain.text_splitter import RecursiveCharacterTextSplitter, CharacterTextSplitter, Language
 import code_snippets as code_snippets
 import tiktoken
-
+import introspector
+import urllib
+import urllib.parse        
+oparams = st.experimental_get_query_params()
+params = {
+    x: oparams[x][0]  for x in oparams
+}
 
 # Streamlit UI
 st.title("Text Splitter Playground")
@@ -16,7 +22,11 @@ st.info("""Split a text into chunks using a **Text Splitter**. Parameters includ
 col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
 
 with col1:
-    chunk_size = st.number_input(min_value=1, label="Chunk Size", value=1000)
+    chunk_size = st.number_input(
+        min_value=1,
+        label="Chunk Size",
+        value=int(params.get("chunk-size",1000)),
+        key="chunk-size")
 
 with col2:
     # Setting the max value of chunk_overlap based on chunk_size
@@ -24,7 +34,8 @@ with col2:
         min_value=1,
         max_value=chunk_size - 1,
         label="Chunk Overlap",
-        value=int(chunk_size * 0.2),
+        value=int(params.get("chunk-overlap",int(chunk_size * 0.2))),
+        key="chunk-overlap"
     )
 
     # Display a warning if chunk_overlap is not less than chunk_size
@@ -32,15 +43,26 @@ with col2:
         st.warning("Chunk Overlap should be less than Chunk Length!")
 
 with col3:
+    opts =["Characters", "Tokens"]
     length_function = st.selectbox(
-        "Length Function", ["Characters", "Tokens"]
+        "Length Function", opts,
+        key="LengthFunction",
+        index=opts.index(params.get("LengthFunction","Characters"))
     )
 
 splitter_choices = ["RecursiveCharacter", "Character"] + [str(v) for v in Language]
 
 with col4:
+#    splitter_choices
+    choice = params.get("text_splitter",splitter_choices[0])
+    opt_index = 0
+    if choice in splitter_choices:
+        opt_index = splitter_choices.index(choice)
+    
     splitter_choice = st.selectbox(
-        "Select a Text Splitter", splitter_choices
+        "Select a Text Splitter", splitter_choices,
+        key="text_splitter",
+        index=opt_index,
     )
 
 if length_function == "Characters":
@@ -84,10 +106,29 @@ else:
 
 st.info(import_text)
 
+#for x in oparams:
+#    if x in st.session_state:
+        # fixme validate thise
+        #if x in ("mode","input_id","workflow"):
+        #st.write("DEBUG",x,st.session_state[x],oparams[x][0])
+        #st.session_state[x] = oparams[x][0]
+
 # Box for pasting text
-doc = st.text_area("Paste your text here:")
+default_text = introspector.get_input()
+#st.code(default_text)
+doc = st.text_area("Paste your text here:", key="text-input", value=default_text, height=400)
+
+## create self  link
+q= st.experimental_get_query_params()
+for x in st.session_state:
+    v = st.session_state[x]
+    q[x]= v
+q["text-input"]=q["text-input"][0:256] #truncate
+encoded_query = urllib.parse.urlencode(q, doseq=True)
+st.markdown(f"* share [input_link full](/?{encoded_query})")
 
 # Split text button
+#if (len(default_text ) >10) or
 if st.button("Split Text"):
     # Choose splitter
     if splitter_choice == "Character":
@@ -113,5 +154,14 @@ if st.button("Split Text"):
     # Display the splits
     for idx, split in enumerate(splits, start=1):
         st.text_area(
-            f"Split {idx}", split, height=200
+            
+            f"Split {idx}", split, height=200,
+            #key=
         )
+        q["text"] = split
+        q["idx"] = split
+        encoded_query = urllib.parse.urlencode(q, doseq=True)
+        st.markdown(f"* share [input_link {split[0:50]}](/?{encoded_query})")
+
+
+
