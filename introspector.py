@@ -11,8 +11,8 @@ def get_input():
     total = ""
     q= st.experimental_get_query_params()
     new_messages = []
-    if "text" in q:
-        return q["text"]
+    if "text-input" in q:
+        return q["text-input"]
     if "messages" in q:
         for item in q["messages"]:
             new1 = urllib.parse.unquote(item)

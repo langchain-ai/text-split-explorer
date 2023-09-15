@@ -116,6 +116,8 @@ st.info(import_text)
 # Box for pasting text
 default_text = introspector.get_input()
 #st.code(default_text)
+base_url = st.text_input("base_url", key="base-url", value=params.get("base-url",""), help="for the target")
+
 doc = st.text_area("Paste your text here:", key="text-input", value=default_text, height=400)
 
 ## create self  link
@@ -125,7 +127,7 @@ for x in st.session_state:
     q[x]= v
 q["text-input"]=q["text-input"][0:256] #truncate
 encoded_query = urllib.parse.urlencode(q, doseq=True)
-st.markdown(f"* share [input_link full](/?{encoded_query})")
+st.markdown(f"* share [input_link full]({base_url}/?{encoded_query})")
 
 # Split text button
 #if (len(default_text ) >10) or
@@ -158,10 +160,10 @@ if st.button("Split Text"):
             f"Split {idx}", split, height=200,
             #key=
         )
-        q["text"] = split
+        q["text-input"] = split
         q["idx"] = split
         encoded_query = urllib.parse.urlencode(q, doseq=True)
-        st.markdown(f"* share [input_link {split[0:50]}](/?{encoded_query})")
+        st.markdown(f"* share [input_link {split[0:50]}]({base_url}/?{encoded_query})")
 
 
 
