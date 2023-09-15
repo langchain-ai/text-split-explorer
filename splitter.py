@@ -13,6 +13,7 @@ params = {
 # Streamlit UI
 st.title("Introspector Text Splitter Playground")
 st.info("""Split a text into chunks using a **Text Splitter**. Parameters include:
+Fork of the amazing https://langchain-text-splitter.streamlit.app
 
 ## URL Specification
 
