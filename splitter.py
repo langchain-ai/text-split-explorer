@@ -11,13 +11,53 @@ params = {
 }
 
 # Streamlit UI
-st.title("Text Splitter Playground")
+st.title("Introspector Text Splitter Playground")
 st.info("""Split a text into chunks using a **Text Splitter**. Parameters include:
 
-- `chunk_size`: Max size of the resulting chunks (in either characters or tokens, as selected)
-- `chunk_overlap`: Overlap between the resulting chunks (in either characters or tokens, as selected)
-- `length_function`: How to measure lengths of chunks, examples are included for either characters or tokens
-- The type of the text splitter, this largely controls the separators used to split on
+## URL Specification
+
+This specification outlines the structure of URLs used in the application, detailing the query parameters and their expected values.
+
+### General URL Structure
+- URLs should follow the standard format: `http://example.com/path/to/resource?query_parameter=value`
+
+### Query Parameters
+
+1. `text-input` (Optional)
+   - Description: Represents text input for the application.
+   - Value: A URL-encoded string containing the text input data.
+   - Example: `http://example.com/app?text-input=This+is+an+example+text`
+
+2. `messages` (Optional)
+   - Description: Represents a list of messages or data items.
+   - Value: A list of URL-encoded strings, where each string represents a message or data item.
+   - Example: `http://example.com/app?messages=http%3A%2F%2Fmessage1.com&messages=http%3A%2F%2Fmessage2.com`
+
+3 `chunk-size`: Max size of the resulting chunks (in either characters or tokens, as selected)
+4 `chunk-overlap`: Overlap between the resulting chunks (in either characters or tokens, as selected)
+5 `length-function`: How to measure lengths of chunks, examples are included for either characters or tokens
+ - The type of the text splitter, this largely controls the separators used to split on
+6. 'base-url': what url to use as base
+7. 'text-splitter: what algo to use splitter_choices = ["RecursiveCharacter", "Character"] + [str(v) for v in Language]
+
+### Processing Logic
+
+1. If the `text-input` parameter is present in the URL, the application should use the value associated with `text-input` as the text input data.
+
+2. If the `messages` parameter is present in the URL, the application should iterate through each item in the list of messages.
+
+3. For each message (item) in the list, the application should:
+   - Decode URL-encoded characters in the message.
+   - Check if the decoded message starts with "http" (indicating a URL).
+   - If the message starts with "http," the application should resolve the URL using the `resolver` function and use the resolved content.
+   - If the message doesn't start with "http," the application should handle it as other content.
+
+### Handling Other Content
+
+- If a message doesn't start with "http" (indicating other content), the application should:
+   - Use the original content a iput
+
+
 """)
 col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
 
@@ -46,8 +86,8 @@ with col3:
     opts =["Characters", "Tokens"]
     length_function = st.selectbox(
         "Length Function", opts,
-        key="LengthFunction",
-        index=opts.index(params.get("LengthFunction","Characters"))
+        key="length-function",
+        index=opts.index(params.get("length-function","Characters"))
     )
 
 splitter_choices = ["RecursiveCharacter", "Character"] + [str(v) for v in Language]
@@ -61,7 +101,7 @@ with col4:
     
     splitter_choice = st.selectbox(
         "Select a Text Splitter", splitter_choices,
-        key="text_splitter",
+        key="text-splitter",
         index=opt_index,
     )
 
@@ -156,9 +196,7 @@ if st.button("Split Text"):
     # Display the splits
     for idx, split in enumerate(splits, start=1):
         st.text_area(
-            
             f"Split {idx}", split, height=200,
-            #key=
         )
         q["text-input"] = split
         q["idx"] = split
